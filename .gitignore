@@ -2,3 +2,5 @@ demo
 *.exe
 /wutest
 lsyncd.*
+/experiment
+/.vscode
