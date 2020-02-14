@@ -4,6 +4,7 @@
 package winapi
 
 import (
+	"errors"
 	"syscall"
 	"unsafe"
 )
@@ -13,6 +14,10 @@ var (
 	procGetDefaultUserProfileDirectoryW = modUserenv.NewProc("GetDefaultUserProfileDirectoryW")
 	procGetProfilesDirectoryW           = modUserenv.NewProc("GetProfilesDirectoryW")
 	userCreateProfile                   = modUserenv.NewProc("CreateProfile")
+)
+
+const (
+	ERROR_ALREADY_EXISTS = 2147942583
 )
 
 // GetDefaultUserProfileDirectory returns the path to the directory in which the
@@ -109,6 +114,9 @@ func CreateUserProfile(username string) (string, error) {
 		uintptr(unsafe.Pointer(&buffer[0])),
 		uintptr(bufferSize),
 	)
+	if r1 == ERROR_ALREADY_EXISTS {
+		return "", errors.New("ERROR_ALREADY_EXISTS")
+	}
 	if r1 != 0 {
 		return "", err
 	}
