@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	so "github.com/iamacarpet/go-win64api/shared"
+	so "github.com/tera-insights/go-win64api/shared"
 )
 
 // Windows API functions
@@ -148,6 +148,15 @@ func SetThreadExecutionState(state uint32) (uint32, error) {
 	}
 
 	return uint32(res), nil
+}
+
+// CloseHandle closes an open object handle.
+func CloseHandle(handle uintptr) error {
+	ret, _, err := procCloseHandle.Call(handle)
+	if ret == 0 {
+		return err
+	}
+	return nil
 }
 
 func ProcessKill(pid uint32) (bool, error) {

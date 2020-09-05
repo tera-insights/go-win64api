@@ -8,8 +8,8 @@ import (
 
 	ole "github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
-	so "github.com/iamacarpet/go-win64api/shared"
 	"github.com/scjalliance/comshim"
+	so "github.com/tera-insights/go-win64api/shared"
 )
 
 // BackupBitLockerRecoveryKeys backups up volume recovery information to Active Directory.
