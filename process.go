@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	so "github.com/iamacarpet/go-win64api/shared"
+	so "github.com/tera-insights/go-win64api/shared"
 )
 
 // Windows API functions
@@ -131,6 +131,15 @@ func newProcessData(e *PROCESSENTRY32, path string, user string) so.Process {
 		Fullpath:   path,
 		Username:   user,
 	}
+}
+
+// CloseHandle closes an open object handle.
+func CloseHandle(handle uintptr) error {
+	ret, _, err := procCloseHandle.Call(handle)
+	if ret == 0 {
+		return err
+	}
+	return nil
 }
 
 func ProcessKill(pid uint32) (bool, error) {

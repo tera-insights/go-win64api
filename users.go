@@ -9,7 +9,7 @@ import (
 	"time"
 	"unsafe"
 
-	so "github.com/iamacarpet/go-win64api/shared"
+	so "github.com/tera-insights/go-win64api/shared"
 )
 
 var (
@@ -23,6 +23,11 @@ var (
 	usrNetLocalGroupAddMembers = modNetapi32.NewProc("NetLocalGroupAddMembers")
 	usrNetLocalGroupDelMembers = modNetapi32.NewProc("NetLocalGroupDelMembers")
 	usrNetApiBufferFree        = modNetapi32.NewProc("NetApiBufferFree")
+
+	usrLoginUserW = modAdvapi32.NewProc("LogonUserW")
+
+	usrLoadUserProfileW  = modUserenv.NewProc("LoadUserProfileW")
+	usrUnloadUserProfile = modUserenv.NewProc("UnloadUserProfile")
 )
 
 const (
@@ -58,6 +63,23 @@ const (
 	USER_UF_PASSWD_CANT_CHANGE = 64
 	USER_UF_NORMAL_ACCOUNT     = 512
 	USER_UF_DONT_EXPIRE_PASSWD = 65536
+
+	LOGON32_LOGON_INTERACTIVE       = uint32(2)
+	LOGON32_LOGON_NETWORK           = uint32(3)
+	LOGON32_LOGON_BATCH             = uint32(4)
+	LOGON32_LOGON_SERVICE           = uint32(5)
+	LOGON32_LOGON_UNLOCK            = uint32(7)
+	LOGON32_LOGON_NETWORK_CLEARTEXT = uint32(8)
+	LOGON32_LOGON_NEW_CREDENTIALS   = uint32(9)
+
+	LOGON32_PROVIDER_DEFAULT = uint32(0)
+	LOGON32_PROVIDER_WINNT35 = uint32(1)
+	LOGON32_PROVIDER_WINNT40 = uint32(2)
+	LOGON32_PROVIDER_WINNT50 = uint32(3)
+	LOGON32_PROVIDER_VIRTUAL = uint32(4)
+
+	PI_NOUI        = uint32(1)
+	PI_APPLYPOLICY = uint32(2)
 )
 
 type USER_INFO_1 struct {
@@ -110,7 +132,7 @@ type USER_INFO_1011 struct {
 	Usri1011_full_name *uint16
 }
 
-// USER_INFO_1052 is the Go representation of the Windwos _USER_INFO_1052 struct
+// USER_INFO_1052 is the Go representation of the Windows _USER_INFO_1052 struct
 // used to set a user's profile directory.
 //
 // See: https://docs.microsoft.com/en-us/windows/desktop/api/lmaccess/ns-lmaccess-_user_info_1052
@@ -120,6 +142,20 @@ type USER_INFO_1052 struct {
 
 type LOCALGROUP_MEMBERS_INFO_3 struct {
 	Lgrmi3_domainandname *uint16
+}
+
+// PROFILEINFOW is the Go representation of the Windows PROFILEINFOW struct.
+//
+// See: https://docs.microsoft.com/en-us/windows/win32/api/profinfo/ns-profinfo-profileinfow
+type PROFILEINFOW struct {
+	dwSize        uint32
+	dwFlags       uint32
+	lpUserName    *uint16
+	lpProfilePath *uint16
+	lpDefaultPath *uint16
+	lpServerName  *uint16
+	lpPolicyPath  *uint16
+	hProfile      uintptr
 }
 
 // UserAddOptions contains extended options for creating a new user account.
@@ -655,4 +691,189 @@ func DomainUserLocked(username string, domain string) (bool, error) {
 	data := (*USER_INFO_2)(unsafe.Pointer(dataPointer))
 
 	return (data.Usri2_flags & USER_UF_LOCKOUT) == USER_UF_LOCKOUT, nil
+}
+
+// LogonUser attempts to log a user on to the local computer.
+//
+// If the `domain` parameter is the empty string, it will be translated to NULL.
+//
+// Once done with the token handle, it should be closed using `CloseHandle()`.
+//
+// See: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-logonuserw
+func LogonUser(username, domain, password string, logonType, logonProvider uint32) (uintptr, error) {
+	var token uintptr
+
+	usernamePtr, err := syscall.UTF16PtrFromString(username)
+	if err != nil {
+		return 0, fmt.Errorf("unable to encode username to UTF16: %w", err)
+	}
+
+	var domainPtr *uint16
+	if domain != "" {
+		domainPtr, err = syscall.UTF16PtrFromString(domain)
+		if err != nil {
+			return 0, fmt.Errorf("unable to encode domain name to UTF16: %w", err)
+		}
+	}
+
+	passwordPtr, err := syscall.UTF16PtrFromString(password)
+	if err != nil {
+		return 0, fmt.Errorf("unable to encode password to UTF16: %w", err)
+	}
+
+	ret, _, err := usrLoginUserW.Call(
+		uintptr(unsafe.Pointer(usernamePtr)), // lpszUsername
+		uintptr(unsafe.Pointer(domainPtr)),   // lpszDomain
+		uintptr(unsafe.Pointer(passwordPtr)), // lpszPassword
+		uintptr(logonType),                   // dwLogonType
+		uintptr(logonProvider),               // dwLogonProvider
+		uintptr(unsafe.Pointer(&token)),      // phToken
+	)
+	if ret == 0 {
+		return 0, err
+	}
+	return token, nil
+}
+
+// LoadUserProfile loads the specified user's profile. The profile can be a local user
+// profile or a roaming user profile.
+//
+// For flags, the only valid option is PI_NOUI, which supresses the display of profile
+// error messages.
+//
+// If the `domain`, `roamingProfilePath`, or `defaultProfilePath` arguments are the empty
+// string, they will be specified as NULL to the underlying API.
+//
+// Returns a handle to the user's registry subtree on success.
+//
+// DO NOT pass this handle to `CloseHandle()`. This should be passed to
+// `UnloadUserProfile()` when done.
+//
+// See: https://docs.microsoft.com/en-us/windows/win32/api/userenv/nf-userenv-loaduserprofilew
+func LoadUserProfile(
+	token uintptr, flags uint32,
+	username, domain, roamingProfilePath, defaultProfilePath string,
+) (uintptr, error) {
+	usernamePtr, err := syscall.UTF16PtrFromString(username)
+	if err != nil {
+		return 0, fmt.Errorf("unable to encode username to UTF16: %w", err)
+	}
+
+	var domainPtr *uint16
+	if domain != "" {
+		domainPtr, err = syscall.UTF16PtrFromString(domain)
+		if err != nil {
+			return 0, fmt.Errorf("unable to encode domain to UTF16: %w", err)
+		}
+	}
+
+	var roamingProfilePtr *uint16
+	if roamingProfilePath != "" {
+		roamingProfilePtr, err = syscall.UTF16PtrFromString(roamingProfilePath)
+		if err != nil {
+			return 0, fmt.Errorf("unable to encode roaming profile path to UTF16: %w", err)
+		}
+	}
+
+	var defaultProfilePtr *uint16
+	if defaultProfilePath != "" {
+		defaultProfilePtr, err = syscall.UTF16PtrFromString(roamingProfilePath)
+		if err != nil {
+			return 0, fmt.Errorf("unable to encode default profile path to UTF16: %w", err)
+		}
+	}
+
+	profileInfo := PROFILEINFOW{
+		dwFlags:       flags,
+		lpUserName:    usernamePtr,
+		lpProfilePath: roamingProfilePtr,
+		lpDefaultPath: defaultProfilePtr,
+		lpServerName:  domainPtr,
+		lpPolicyPath:  nil, // Not used
+	}
+	profileInfo.dwSize = uint32(unsafe.Sizeof(profileInfo))
+
+	ret, _, err := usrLoadUserProfileW.Call(
+		token,
+		uintptr(unsafe.Pointer(&profileInfo)),
+	)
+	if ret == 0 {
+		return 0, err
+	}
+
+	return profileInfo.hProfile, nil
+}
+
+// UnloadUserProfile unloads a user's profile that was loaded by the `LoadUserProfile()` function.
+//
+// See: https://docs.microsoft.com/en-us/windows/win32/api/userenv/nf-userenv-unloaduserprofile
+func UnloadUserProfile(token, profile uintptr) error {
+	ret, _, err := usrUnloadUserProfile.Call(
+		token,
+		profile,
+	)
+	if ret == 0 {
+		return err
+	}
+	return nil
+}
+
+// EnsureUserProfileCreatedOptions contains optional parameters to the
+// EnsureUserProfileCreated function.
+//
+// If not specified, the defaults are:
+//
+//	LogonType = LOGON32_LOGON_INTERACTIVE
+//  LogonProvider = LOGON32_PROVIDER_DEFAULT
+//  Flags = PI_NOUI
+//  RoamingProfilePath = ""
+//  DefaultProfilePath = ""
+type EnsureUserProfileCreatedOptions struct {
+	LogonType          uint32
+	LogonProvider      uint32
+	Flags              uint32
+	RoamingProfilePath string
+	DefaultProfilePath string
+}
+
+// EnsureUserProfileCreated is a helper function that ensures a user's profile has been
+// created by logging in as them and loading their profile.
+//
+// This is essentially the same as calling the following functions in order:
+//   - LogonUser
+//	 - LoadUserProfile
+//	 - UnloadUserProfile
+//	 - CloseHandle
+func EnsureUserProfileCreated(username, domain, password string, opts *EnsureUserProfileCreatedOptions) error {
+	logonType := LOGON32_LOGON_INTERACTIVE
+	logonProvider := LOGON32_PROVIDER_DEFAULT
+	flags := PI_NOUI
+	roamingProfilePath := ""
+	defaultProfilePath := ""
+
+	if opts != nil {
+		logonType = opts.LogonType
+		logonProvider = opts.LogonProvider
+		flags = opts.Flags
+		roamingProfilePath = opts.RoamingProfilePath
+		defaultProfilePath = opts.DefaultProfilePath
+	}
+
+	token, err := LogonUser(username, domain, password, logonType, logonProvider)
+	if err != nil {
+		return fmt.Errorf("failed to log on user: %w", err)
+	}
+	defer CloseHandle(token)
+
+	profileHandle, err := LoadUserProfile(token, flags, username, domain, roamingProfilePath, defaultProfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to load user profile: %w", err)
+	}
+
+	err = UnloadUserProfile(token, profileHandle)
+	if err != nil {
+		return fmt.Errorf("failed to unload user profile: %w", err)
+	}
+
+	return nil
 }
