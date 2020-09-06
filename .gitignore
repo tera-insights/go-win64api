@@ -4,3 +4,4 @@ demo
 lsyncd.*
 /experiment
 /.vscode
+/bin/
