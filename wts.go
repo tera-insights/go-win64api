@@ -143,7 +143,7 @@ func WTSEnumerateSessionsEx(serverHandle uintptr) ([]so.WTSSessionInfo1, error) 
 			ExecEnvID:   data.ExecEnvId,
 			State:       so.WTSConnectState(data.State),
 			SessionID:   data.SessionId,
-			SessionName: UTF16toString(data.pSessionName),
+			SessionName: utf16toStringOrEmpty(data.pSessionName),
 			HostName:    utf16toStringOrEmpty(data.pHostName),
 			UserName:    utf16toStringOrEmpty(data.pUserName),
 			DomainName:  utf16toStringOrEmpty(data.pDomainName),
