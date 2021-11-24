@@ -5,3 +5,4 @@ lsyncd.*
 /experiment
 /.vscode
 /bin/
+/vendor
