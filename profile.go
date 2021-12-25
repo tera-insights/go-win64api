@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	modUserenv                          = syscall.NewLazyDLL("Userenv.dll")
+	modUserenv                          = syscall.NewLazyDLL("userenv.dll")
 	procGetDefaultUserProfileDirectoryW = modUserenv.NewProc("GetDefaultUserProfileDirectoryW")
 	procGetProfilesDirectoryW           = modUserenv.NewProc("GetProfilesDirectoryW")
 	userCreateProfile                   = modUserenv.NewProc("CreateProfile")
