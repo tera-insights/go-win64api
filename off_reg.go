@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	modOffreg            = syscall.NewLazyDLL("Offreg.dll")
+	modOffreg            = syscall.NewLazyDLL("offreg.dll")
 	procOROpenHive       = modOffreg.NewProc("OROpenHive")
 	procORSaveHive       = modOffreg.NewProc("ORSaveHive")
 	procORCloseHive      = modOffreg.NewProc("ORCloseHive")
