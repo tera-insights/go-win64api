@@ -1,0 +1,18 @@
+{
+    "name": "windows",
+    "image": "registry.terainsights.net/tc-vmcontrol/mingw64:latest",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.go"
+            ]
+        }
+    },
+    "mounts": [
+        "source=profile,target=/root,type=volume"
+    ],
+    "containerEnv": {
+        "VARIANT": "mingw64",
+        "GOOS": "windows"
+    }
+}
