@@ -57,11 +57,11 @@ func SetFilePermissions(owner string, usernames []string, groupnames []string, p
 		return err
 	}
 
-	group, err := user.Lookup(owner)
+	ownerObj, err := user.Lookup(owner)
 	if err != nil {
 		return err
 	}
-	ownerSID, err := windows.StringToSid(group.Gid)
+	ownerSID, err := windows.StringToSid(ownerObj.Uid)
 	if err != nil {
 		return err
 	}
