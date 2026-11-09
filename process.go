@@ -402,7 +402,7 @@ func getProcessLUID(pid uint32) (retLUID LUID, isAdmin bool, retError error) {
 	}
 
 	// Check token for membership of the Administrators group.
-	var chkRes bool
+	var chkRes int32 // BOOL is 4 bytes
 	mbrRes, _, _ := procCheckTokenMembership.Call(
 		uintptr(ttHandle),
 		uintptr(AdministratorsGroup),
@@ -412,7 +412,7 @@ func getProcessLUID(pid uint32) (retLUID LUID, isAdmin bool, retError error) {
 		retError = fmt.Errorf("Error checking group membership")
 		return
 	} else {
-		isAdmin = chkRes
+		isAdmin = chkRes != 0
 	}
 
 	var ltHandle uintptr
@@ -455,7 +455,7 @@ func getProcessLUID(pid uint32) (retLUID LUID, isAdmin bool, retError error) {
 		retError = fmt.Errorf("Error checking group membership (2): %s", lastError)
 		return
 	} else {
-		isAdmin = chkRes
+		isAdmin = chkRes != 0
 	}
 
 	return

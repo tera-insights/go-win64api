@@ -39,7 +39,7 @@ func GetRawSidForAccountName(accountName string) ([]byte, error) {
 
 	var sidSize uint32
 	var refDomainSize uint32
-	var eUse byte
+	var eUse uint32 // SID_NAME_USE is a 4-byte enum
 
 	// Get sizes first, which always returns failure.
 	_, _, err = usrLookupAccountNameW.Call(

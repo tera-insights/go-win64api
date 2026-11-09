@@ -204,9 +204,10 @@ func GetExplicitEntriesFromACL(acl *windows.ACL) (*[]windows.EXPLICIT_ACCESS, er
 
 // GetSecurityDescriptorDACL gets an DACL from a security descriptor
 func GetSecurityDescriptorDACL(pSecDescriptor []uint16) (*windows.ACL, bool, bool, error) {
-	var present bool
+	// GetSecurityDescriptorDacl writes 4-byte BOOLs; a Go bool is 1 byte.
+	var present int32
 	var acl *windows.ACL
-	var defaulted bool
+	var defaulted int32
 	// Get dacl
 	r1, _, err := procGetSecurityDescriptorDACL.Call(
 		uintptr(unsafe.Pointer(&pSecDescriptor[0])),
@@ -214,10 +215,10 @@ func GetSecurityDescriptorDACL(pSecDescriptor []uint16) (*windows.ACL, bool, boo
 		uintptr(unsafe.Pointer(&acl)),
 		uintptr(unsafe.Pointer(&defaulted)),
 	)
-	if r1 == 0 && !present {
+	if r1 == 0 && present == 0 {
 		return acl, false, false, err
 	}
-	return acl, present, defaulted, nil
+	return acl, present != 0, defaulted != 0, nil
 }
 
 // SetSecurityDescriptorDACL sets an DACL for a security descriptor
